@@ -9,7 +9,7 @@ set(CMAKE_AUTORCC ON)
 # CMAKE_AUTOUIC removed - QML doesn't use .ui files
 
 # Find Qt6 - Added Quick, Qml, QuickControls2 for QML support
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Widgets Gui Quick Qml QuickControls2)
+find_package(Qt6 6.8.0 REQUIRED COMPONENTS Core Widgets Gui Quick Qml QuickControls2)
 
 # Source files
 set(SOURCES
