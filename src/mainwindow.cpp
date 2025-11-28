@@ -4,19 +4,29 @@
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QDebug>
+#include <QSettings>
+#include <QDateTime>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , appManager(new AppManager(this))
+    , scrcpyProcess(nullptr)
 {
     ui->setupUi(this);
     setWindowIcon(QIcon(":/resources/icon.png"));
+    
+    // Set splitter initial sizes (60% left, 40% right)
+    ui->splitter->setSizes(QList<int>() << 600 << 400);
     
     // Connect signals from UI elements
     connect(ui->appListWidget, &QListWidget::itemClicked, this, &MainWindow::onAppSelected);
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::onRefreshClicked);
     connect(ui->manualAddButton, &QPushButton::clicked, this, &MainWindow::onManualAddClicked);
+    
+    // Connect scrcpy control buttons
+    connect(ui->stopScrcpyButton, &QPushButton::clicked, this, &MainWindow::onStopScrcpyClicked);
+    connect(ui->clearLogsButton, &QPushButton::clicked, this, &MainWindow::onClearLogsClicked);
     
     // Connect menu actions
     connect(ui->actionRefresh, &QAction::triggered, this, &MainWindow::onRefreshClicked);
@@ -39,12 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    // Clean up opened windows
-    for (ScrcpyWindow *window : openWindows) {
-        if (window) {
-            window->close();
-        }
-    }
+    stopScrcpy();
     delete ui;
 }
 
@@ -78,18 +83,211 @@ void MainWindow::onAppSelected(QListWidgetItem *item)
 
     qDebug() << "Launching scrcpy for:" << packageName;
 
-    // Create new window for scrcpy
-    ScrcpyWindow *window = new ScrcpyWindow(packageName, appName, this);
-    window->setAttribute(Qt::WA_DeleteOnClose);
+    // Stop current scrcpy if running
+    if (scrcpyProcess && scrcpyProcess->state() == QProcess::Running) {
+        appendLog("Stopping current scrcpy session...", "#ff9800");
+        stopScrcpy();
+    }
 
-    // Track the window
-    openWindows.append(window);
-    connect(window, &QObject::destroyed, this, [this, window]() {
-        openWindows.removeOne(window);
-    });
+    launchScrcpy(packageName, appName);
+}
 
-    window->show();
-    window->launchScrcpy();
+void MainWindow::launchScrcpy(const QString &packageName, const QString &appName)
+{
+    currentPackageName = packageName;
+    currentAppName = appName;
+    
+    if (scrcpyProcess) {
+        delete scrcpyProcess;
+    }
+
+    scrcpyProcess = new QProcess(this);
+
+    // Connect signals
+    connect(scrcpyProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &MainWindow::onScrcpyFinished);
+    connect(scrcpyProcess, &QProcess::errorOccurred, this, &MainWindow::onScrcpyError);
+    connect(scrcpyProcess, &QProcess::started, this, &MainWindow::onScrcpyStarted);
+    connect(scrcpyProcess, &QProcess::readyReadStandardOutput, this, &MainWindow::onScrcpyReadyReadStandardOutput);
+    connect(scrcpyProcess, &QProcess::readyReadStandardError, this, &MainWindow::onScrcpyReadyReadStandardError);
+
+    // Build scrcpy command
+    QStringList arguments;
+
+    arguments << "--new-display";
+    arguments << "--start-app=" + packageName;
+
+    // Load settings
+    QSettings settings("ScrcpyGUI", "Settings");
+
+    // General
+    if (settings.value("always-on-top", false).toBool()) arguments << "--always-on-top";
+    if (settings.value("no-control", false).toBool()) arguments << "--no-control";
+    if (settings.value("stay-awake", false).toBool()) arguments << "--stay-awake";
+    if (settings.value("turn-screen-off", false).toBool()) arguments << "--turn-screen-off";
+    if (settings.value("no-vd-destroy-content", false).toBool()) arguments << "--no-vd-destroy-content";
+    if (settings.value("show-touches", false).toBool()) arguments << "--show-touches";
+    if (settings.value("disable-screensaver", false).toBool()) arguments << "--disable-screensaver";
+
+    // Video
+    int maxSize = settings.value("max-size", 0).toInt();
+    if (maxSize > 0) arguments << "--max-size" << QString::number(maxSize);
+
+    QString bitRate = settings.value("bit-rate", "Default (8M)").toString();
+    if (bitRate != "Default (8M)") arguments << "--bit-rate" << bitRate;
+
+    int maxFps = settings.value("max-fps", 0).toInt();
+    if (maxFps > 0) arguments << "--max-fps" << QString::number(maxFps);
+
+    QString videoCodec = settings.value("video-codec", "Default (h264)").toString();
+    if (videoCodec != "Default (h264)") arguments << "--video-codec" << videoCodec;
+
+    int rotation = settings.value("rotation", 0).toInt();
+    if (rotation > 0) arguments << "--rotation" << QString::number(rotation);
+
+    if (settings.value("no-mipmaps", false).toBool()) arguments << "--no-mipmaps";
+
+    // Audio
+    if (settings.value("no-audio", false).toBool()) arguments << "--no-audio";
+    
+    QString audioCodec = settings.value("audio-codec", "Default (opus)").toString();
+    if (audioCodec != "Default (opus)") arguments << "--audio-codec" << audioCodec;
+
+    QString audioBitRate = settings.value("audio-bit-rate", "Default (128K)").toString();
+    if (audioBitRate != "Default (128K)") arguments << "--audio-bit-rate" << audioBitRate;
+
+    // Window
+    if (settings.value("fullscreen", false).toBool()) arguments << "--fullscreen";
+    if (settings.value("window-borderless", false).toBool()) arguments << "--window-borderless";
+    
+    QString windowTitle = settings.value("window-title", "").toString();
+    if (!windowTitle.isEmpty()) {
+        arguments << "--window-title" << windowTitle;
+    } else {
+        arguments << "--window-title" << appName;
+    }
+
+    // Advanced
+    QString customArgs = settings.value("custom-args", "").toString();
+    if (!customArgs.isEmpty()) {
+        arguments << customArgs.split(" ", Qt::SkipEmptyParts);
+    }
+
+    qDebug() << "Launching scrcpy with args:" << arguments;
+
+    appendLog("========================================", "#4fc3f7");
+    appendLog(QString("[%1] Launching scrcpy for %2")
+              .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+              .arg(appName), "#4fc3f7");
+    appendLog("Package: " + packageName, "#9e9e9e");
+    appendLog("Command: scrcpy " + arguments.join(" "), "#9e9e9e");
+    appendLog("========================================", "#4fc3f7");
+
+    ui->scrcpyStatusLabel->setText("Starting scrcpy for " + appName + "...");
+    scrcpyProcess->start("scrcpy", arguments);
+}
+
+void MainWindow::stopScrcpy()
+{
+    if (scrcpyProcess && scrcpyProcess->state() == QProcess::Running) {
+        appendLog("Terminating scrcpy...", "#ff9800");
+        scrcpyProcess->terminate();
+        if (!scrcpyProcess->waitForFinished(3000)) {
+            appendLog("Force killing scrcpy...", "#f44336");
+            scrcpyProcess->kill();
+        }
+    }
+}
+
+void MainWindow::appendLog(const QString &text, const QString &color)
+{
+    QString coloredText = QString("<span style='color:%1;'>%2</span>")
+                          .arg(color)
+                          .arg(text.toHtmlEscaped());
+    ui->logTextEdit->append(coloredText);
+}
+
+void MainWindow::onStopScrcpyClicked()
+{
+    stopScrcpy();
+}
+
+void MainWindow::onClearLogsClicked()
+{
+    ui->logTextEdit->clear();
+    appendLog("Logs cleared", "#9e9e9e");
+}
+
+void MainWindow::onScrcpyStarted()
+{
+    qDebug() << "Scrcpy started successfully";
+    appendLog("Scrcpy started successfully!", "#4caf50");
+    ui->scrcpyStatusLabel->setText("Running: " + currentAppName);
+    ui->scrcpyStatusLabel->setStyleSheet("color: #4caf50; padding: 5px;");
+    ui->stopScrcpyButton->setEnabled(true);
+}
+
+void MainWindow::onScrcpyFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    qDebug() << "Scrcpy finished with exit code:" << exitCode;
+
+    ui->stopScrcpyButton->setEnabled(false);
+
+    if (exitStatus == QProcess::NormalExit && exitCode == 0) {
+        appendLog("Scrcpy closed normally", "#4caf50");
+        ui->scrcpyStatusLabel->setText("No scrcpy running");
+        ui->scrcpyStatusLabel->setStyleSheet("color: gray; padding: 5px;");
+    } else {
+        appendLog(QString("Scrcpy exited with error code: %1").arg(exitCode), "#f44336");
+        ui->scrcpyStatusLabel->setText("Scrcpy error - see logs");
+        ui->scrcpyStatusLabel->setStyleSheet("color: #f44336; padding: 5px;");
+    }
+}
+
+void MainWindow::onScrcpyError(QProcess::ProcessError error)
+{
+    QString errorMsg;
+
+    switch (error) {
+        case QProcess::FailedToStart:
+            errorMsg = "Failed to start scrcpy. Make sure scrcpy is installed and in your PATH.";
+            appendLog("ERROR: " + errorMsg, "#f44336");
+            QMessageBox::critical(this, "Scrcpy Error", errorMsg + "\n\nYou can install it from: https://github.com/Genymobile/scrcpy");
+            break;
+        case QProcess::Crashed:
+            errorMsg = "Scrcpy crashed";
+            appendLog("ERROR: " + errorMsg, "#f44336");
+            break;
+        case QProcess::Timedout:
+            errorMsg = "Scrcpy operation timed out";
+            appendLog("ERROR: " + errorMsg, "#f44336");
+            break;
+        default:
+            errorMsg = "An error occurred with scrcpy: " + scrcpyProcess->errorString();
+            appendLog("ERROR: " + errorMsg, "#f44336");
+    }
+
+    qDebug() << "Scrcpy error:" << errorMsg;
+    ui->scrcpyStatusLabel->setText("Error - see logs");
+    ui->scrcpyStatusLabel->setStyleSheet("color: #f44336; padding: 5px;");
+    ui->stopScrcpyButton->setEnabled(false);
+}
+
+void MainWindow::onScrcpyReadyReadStandardOutput()
+{
+    QString output = QString::fromLocal8Bit(scrcpyProcess->readAllStandardOutput());
+    if (!output.trimmed().isEmpty()) {
+        appendLog("[stdout] " + output.trimmed(), "#d4d4d4");
+    }
+}
+
+void MainWindow::onScrcpyReadyReadStandardError()
+{
+    QString output = QString::fromLocal8Bit(scrcpyProcess->readAllStandardError());
+    if (!output.trimmed().isEmpty()) {
+        // stderr dari scrcpy biasanya info, bukan error
+        appendLog("[stderr] " + output.trimmed(), "#ffc107");
+    }
 }
 
 void MainWindow::onRefreshClicked()
@@ -184,4 +382,3 @@ void MainWindow::onSettings()
     SettingsDialog dialog(this);
     dialog.exec();
 }
-

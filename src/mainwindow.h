@@ -3,8 +3,11 @@
 
 #include <QMainWindow>
 #include <QListWidget>
+#include <QProcess>
+#include <QTextEdit>
+#include <QPushButton>
+#include <QLabel>
 #include "appmanager.h"
-#include "scrcpywindow.h"
 
 namespace Ui {
 class MainWindow;
@@ -27,20 +30,34 @@ private slots:
     void onExit();
     void onAbout();
     void onSettings();
+    
+    // Scrcpy control slots
+    void onStopScrcpyClicked();
+    void onClearLogsClicked();
+    void onScrcpyStarted();
+    void onScrcpyFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onScrcpyError(QProcess::ProcessError error);
+    void onScrcpyReadyReadStandardOutput();
+    void onScrcpyReadyReadStandardError();
 
 private:
     void setupUI();
     void loadAppList();
     void addAppToList(const AppInfo &appInfo);
+    void launchScrcpy(const QString &packageName, const QString &appName);
+    void stopScrcpy();
+    void appendLog(const QString &text, const QString &color = "#d4d4d4");
 
     // UI from Qt Designer
     Ui::MainWindow *ui;
 
     // Business Logic
     AppManager *appManager;
-
-    // Track opened windows
-    QList<ScrcpyWindow*> openWindows;
+    
+    // Scrcpy process management
+    QProcess *scrcpyProcess;
+    QString currentPackageName;
+    QString currentAppName;
 };
 
 #endif // MAINWINDOW_H

@@ -16,14 +16,12 @@ find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui)
 set(SOURCES
     src/main.cpp
     src/mainwindow.cpp
-    src/scrcpywindow.cpp
     src/appmanager.cpp
     src/settingsdialog.cpp
 )
 
 set(HEADERS
     src/mainwindow.h
-    src/scrcpywindow.h
     src/appmanager.h
     src/settingsdialog.h
 )
