@@ -7,6 +7,7 @@
 #include <QTextEdit>
 #include <QPushButton>
 #include <QLabel>
+#include <QRadioButton>
 #include "appmanager.h"
 
 namespace Ui {
@@ -39,6 +40,10 @@ private slots:
     void onScrcpyError(QProcess::ProcessError error);
     void onScrcpyReadyReadStandardOutput();
     void onScrcpyReadyReadStandardError();
+    
+    // Filter slots
+    void onFilterChanged();
+    void onRunningAppsLoaded(const QSet<QString> &packages);
 
 private:
     void setupUI();
@@ -47,6 +52,7 @@ private:
     void launchScrcpy(const QString &packageName, const QString &appName);
     void stopScrcpy();
     void appendLog(const QString &text, const QString &color = "#d4d4d4");
+    void applyFilter();
 
     // UI from Qt Designer
     Ui::MainWindow *ui;
@@ -58,6 +64,11 @@ private:
     QProcess *scrcpyProcess;
     QString currentPackageName;
     QString currentAppName;
+    
+    // Filter state
+    bool showRunningOnly;
+    QList<AppInfo> allLoadedApps;
+    QSet<QString> runningPackages;
 };
 
 #endif // MAINWINDOW_H

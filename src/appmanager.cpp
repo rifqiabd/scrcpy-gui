@@ -7,6 +7,7 @@
 AppManager::AppManager(QObject *parent)
     : QObject(parent)
     , adbProcess(nullptr)
+    , runningAppsProcess(nullptr)
 {
     loadCustomApps();
 }
@@ -231,4 +232,63 @@ void AppManager::saveCustomApps()
     file.close();
 
     qDebug() << "Saved config to:" << configPath;
+}
+
+void AppManager::loadRunningApps()
+{
+    runningPackages.clear();
+    
+    if (runningAppsProcess) {
+        delete runningAppsProcess;
+    }
+
+    runningAppsProcess = new QProcess(this);
+
+    connect(runningAppsProcess, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &AppManager::onRunningAppsFinished);
+
+    // Use ps command to get running processes
+    // Filter for user apps (u0_) to exclude system processes
+    QStringList arguments;
+    arguments << "shell" << "ps";
+
+    qDebug() << "Running ADB command to get running apps:" << arguments;
+    runningAppsProcess->start("adb", arguments);
+}
+
+void AppManager::onRunningAppsFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (exitStatus != QProcess::NormalExit || exitCode != 0) {
+        qDebug() << "Failed to get running apps, exit code:" << exitCode;
+        emit runningAppsLoaded(runningPackages);
+        return;
+    }
+
+    QString output = runningAppsProcess->readAllStandardOutput();
+    QStringList lines = output.split('\n', Qt::SkipEmptyParts);
+
+    qDebug() << "Parsing running processes...";
+
+    for (const QString &line : lines) {
+        // Look for package names in process list
+        // Format varies but package names are in the last column
+        QStringList parts = line.simplified().split(' ', Qt::SkipEmptyParts);
+        
+        if (parts.size() > 0) {
+            QString lastPart = parts.last();
+            
+            // Check if it looks like a package name (contains dots)
+            if (lastPart.contains('.') && !lastPart.startsWith('[')) {
+                runningPackages.insert(lastPart);
+            }
+        }
+    }
+
+    qDebug() << "Found" << runningPackages.size() << "running packages";
+    emit runningAppsLoaded(runningPackages);
+}
+
+QSet<QString> AppManager::getRunningPackages() const
+{
+    return runningPackages;
 }

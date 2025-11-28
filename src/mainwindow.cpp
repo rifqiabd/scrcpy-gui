@@ -12,6 +12,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , appManager(new AppManager(this))
     , scrcpyProcess(nullptr)
+    , showRunningOnly(false)
 {
     ui->setupUi(this);
     setWindowIcon(QIcon(":/resources/icon.png"));
@@ -23,6 +24,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->appListWidget, &QListWidget::itemClicked, this, &MainWindow::onAppSelected);
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::onRefreshClicked);
     connect(ui->manualAddButton, &QPushButton::clicked, this, &MainWindow::onManualAddClicked);
+    
+    // Connect filter radio buttons
+    connect(ui->allAppsRadio, &QRadioButton::toggled, this, &MainWindow::onFilterChanged);
+    connect(ui->runningOnlyRadio, &QRadioButton::toggled, this, &MainWindow::onFilterChanged);
     
     // Connect scrcpy control buttons
     connect(ui->stopScrcpyButton, &QPushButton::clicked, this, &MainWindow::onStopScrcpyClicked);
@@ -42,6 +47,7 @@ MainWindow::MainWindow(QWidget *parent)
     // Connect app manager signals
     connect(appManager, &AppManager::appsLoaded, this, &MainWindow::onAppsLoaded);
     connect(appManager, &AppManager::loadError, this, &MainWindow::onLoadError);
+    connect(appManager, &AppManager::runningAppsLoaded, this, &MainWindow::onRunningAppsLoaded);
 
     // Load apps on startup
     loadAppList();
@@ -331,6 +337,8 @@ void MainWindow::onManualAddClicked()
 
 void MainWindow::onAppsLoaded(const QList<AppInfo> &apps)
 {
+    allLoadedApps = apps;  // Store all apps
+    
     ui->appListWidget->clear();
 
     if (apps.isEmpty()) {
@@ -342,10 +350,13 @@ void MainWindow::onAppsLoaded(const QList<AppInfo> &apps)
                                "2. USB debugging is enabled\n"
                                "3. ADB is installed and in PATH");
     } else {
-        for (const AppInfo &app : apps) {
-            addAppToList(app);
+        // Apply current filter
+        if (showRunningOnly) {
+            // Reload running apps then apply filter
+            appManager->loadRunningApps();
+        } else {
+            applyFilter();
         }
-        ui->statusLabel->setText(QString("Loaded %1 apps").arg(apps.size()));
     }
 
     ui->refreshButton->setEnabled(true);
@@ -381,4 +392,58 @@ void MainWindow::onSettings()
 {
     SettingsDialog dialog(this);
     dialog.exec();
+}
+
+void MainWindow::onFilterChanged()
+{
+    showRunningOnly = ui->runningOnlyRadio->isChecked();
+    
+    if (showRunningOnly) {
+        // Load running apps from device
+        ui->statusLabel->setText("Loading running apps...");
+        appManager->loadRunningApps();
+    } else {
+        // Show all apps immediately
+        applyFilter();
+    }
+}
+
+void MainWindow::onRunningAppsLoaded(const QSet<QString> &packages)
+{
+    runningPackages = packages;
+    qDebug() << "Running packages loaded:" << runningPackages.size();
+    
+    if (showRunningOnly) {
+        applyFilter();
+        ui->statusLabel->setText(QString("Showing %1 running apps")
+                                .arg(ui->appListWidget->count()));
+    }
+}
+
+void MainWindow::applyFilter()
+{
+    ui->appListWidget->clear();
+    
+    if (showRunningOnly) {
+        // Show only running apps
+        int count = 0;
+        for (const AppInfo &app : allLoadedApps) {
+            if (runningPackages.contains(app.packageName)) {
+                addAppToList(app);
+                count++;
+            }
+        }
+        
+        if (count == 0) {
+            ui->statusLabel->setText("No running apps found");
+        } else {
+            ui->statusLabel->setText(QString("%1 running apps").arg(count));
+        }
+    } else {
+        // Show all apps
+        for (const AppInfo &app : allLoadedApps) {
+            addAppToList(app);
+        }
+        ui->statusLabel->setText(QString("Loaded %1 apps").arg(allLoadedApps.size()));
+    }
 }
