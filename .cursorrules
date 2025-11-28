@@ -1,0 +1,116 @@
+# Qt GUI Scrcpy Project Rules
+
+## Project Overview
+Cross-platform desktop GUI application for scrcpy (Android screen mirroring tool).
+Built with Qt framework (C++) to provide native look and feel on Windows, macOS, and Linux.
+
+## Key Features
+- List installed Android apps via ADB
+- Launch scrcpy for specific apps in new windows
+- Manual app entry support
+- Persist user-added apps in config file
+
+## Tech Stack
+- Framework: Qt 6.x (QtWidgets)
+- Language: C++ (C++17 minimum)
+- Build System: CMake
+- External Tools: ADB, scrcpy
+
+## Project Structure
+```
+project-root/
+├── src/                    # Source files
+│   ├── main.cpp           # Entry point
+│   ├── mainwindow.cpp/h   # Main window (app list)
+│   ├── scrcpywindow.cpp/h # Scrcpy display window
+│   └── appmanager.cpp/h   # ADB/app management logic
+├── include/               # Header files
+├── ui/                    # Qt UI files (.ui)
+├── resources/             # Icons, assets
+├── config/                # Config file templates
+├── docs/                  # Documentation
+├── CMakeLists.txt         # Build configuration
+└── .cursorrules          # This file
+```
+
+## Coding Standards
+
+### Naming Conventions
+- Classes: PascalCase (e.g., `MainWindow`, `AppManager`)
+- Functions/Methods: camelCase (e.g., `loadAppList`, `launchScrcpy`)
+- Variables: camelCase (e.g., `deviceId`, `packageName`)
+- Constants: UPPER_SNAKE_CASE (e.g., `DEFAULT_FPS`, `CONFIG_PATH`)
+- Files: lowercase with underscores (e.g., `main_window.cpp`)
+
+### Qt-Specific Guidelines
+- Use Qt's signal/slot mechanism for event handling
+- Prefer Qt containers (QList, QMap) over STL when working with Qt APIs
+- Use QProcess for external command execution (ADB, scrcpy)
+- Use QSettings or QJsonDocument for config persistence
+- Always use QObject::deleteLater() instead of delete for QObject-derived classes
+
+### Code Organization
+- Separate UI logic from business logic
+- Keep ADB/scrcpy commands in AppManager class
+- Use forward declarations in headers, include in .cpp files
+- One class per file pair (.h/.cpp)
+
+### Error Handling
+- Check QProcess exit codes and handle failures gracefully
+- Validate ADB availability before operations
+- Show user-friendly error messages via QMessageBox
+- Log errors to console for debugging
+
+## Development Workflow
+1. Design UI in Qt Designer (.ui files) when possible
+2. Implement logic in corresponding .cpp files
+3. Test on primary platform first (Windows/Linux/macOS)
+4. Use CMake for cross-platform builds
+5. Test ADB commands independently before integrating
+
+## External Dependencies
+- Qt 6.x SDK (QtCore, QtWidgets, QtGui)
+- ADB (Android Debug Bridge) - must be in PATH
+- scrcpy - must be in PATH or specified path
+
+## Common Patterns
+
+### Launching ADB Commands
+```cpp
+QProcess *process = new QProcess(this);
+connect(process, &QProcess::finished, this, &MainWindow::onAdbFinished);
+connect(process, &QProcess::readyReadStandardOutput, this, &MainWindow::onAdbOutput);
+process->start("adb", QStringList() << "shell" << "pm" << "list" << "packages" << "-3");
+```
+
+### Creating New Windows
+```cpp
+ScrcpyWindow *window = new ScrcpyWindow(packageName, this);
+window->setAttribute(Qt::WA_DeleteOnClose);
+window->show();
+```
+
+### Config File Format
+Use JSON for storing user-added apps:
+```json
+{
+  "customApps": [
+    {"name": "My App", "package": "com.example.app"},
+    {"name": "Another App", "package": "com.another.app"}
+  ]
+}
+```
+
+## Important Notes
+- Always use Qt's cross-platform APIs, avoid platform-specific code
+- Test with actual Android devices connected via ADB
+- Handle cases where ADB/scrcpy are not installed
+- Support both USB and wireless ADB connections
+- UI should be responsive during ADB operations (use separate threads if needed)
+
+## When Writing Code
+- Focus on clean, maintainable code over clever solutions
+- Add comments for complex logic only
+- Use Qt's MOC (Meta-Object Compiler) features appropriately
+- Ensure proper memory management (Qt parent-child hierarchy)
+- Follow RAII principles for resource management
