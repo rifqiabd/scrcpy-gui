@@ -62,8 +62,11 @@ void ScrcpyWindow::launchScrcpy()
     // Build scrcpy command
     QStringList arguments;
 
+    arguments << "--new-display";
+    arguments << "-Sw";
+    arguments << "-t";
+    arguments << "--start-app=" + packageName;
     arguments << "--window-title" << appName;
-    arguments << "--stay-awake";
 
     qDebug() << "Launching scrcpy with args:" << arguments;
 
