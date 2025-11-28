@@ -68,4 +68,5 @@ endif()
 # Install rules
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
+    BUNDLE DESTINATION .
 )
