@@ -1,4 +1,5 @@
 #include "scrcpywindow.h"
+#include <QSettings>
 #include <QMessageBox>
 #include <QDebug>
 #include <QTimer>
@@ -63,10 +64,63 @@ void ScrcpyWindow::launchScrcpy()
     QStringList arguments;
 
     arguments << "--new-display";
-    arguments << "-Sw";
-    arguments << "-t";
     arguments << "--start-app=" + packageName;
-    arguments << "--window-title" << appName;
+
+    // Load settings
+    QSettings settings("ScrcpyGUI", "Settings");
+
+    // General
+    if (settings.value("always-on-top", false).toBool()) arguments << "--always-on-top";
+    if (settings.value("no-control", false).toBool()) arguments << "--no-control";
+    if (settings.value("stay-awake", false).toBool()) arguments << "--stay-awake";
+    if (settings.value("turn-screen-off", false).toBool()) arguments << "--turn-screen-off";
+    if (settings.value("no-vd-destroy-content", false).toBool()) arguments << "--no-vd-destroy-content";
+    if (settings.value("show-touches", false).toBool()) arguments << "--show-touches";
+    if (settings.value("disable-screensaver", false).toBool()) arguments << "--disable-screensaver";
+
+    // Video
+    int maxSize = settings.value("max-size", 0).toInt();
+    if (maxSize > 0) arguments << "--max-size" << QString::number(maxSize);
+
+    QString bitRate = settings.value("bit-rate", "Default (8M)").toString();
+    if (bitRate != "Default (8M)") arguments << "--bit-rate" << bitRate;
+
+    int maxFps = settings.value("max-fps", 0).toInt();
+    if (maxFps > 0) arguments << "--max-fps" << QString::number(maxFps);
+
+    QString videoCodec = settings.value("video-codec", "Default (h264)").toString();
+    if (videoCodec != "Default (h264)") arguments << "--video-codec" << videoCodec;
+
+    int rotation = settings.value("rotation", 0).toInt();
+    if (rotation > 0) arguments << "--rotation" << QString::number(rotation);
+
+    if (settings.value("no-mipmaps", false).toBool()) arguments << "--no-mipmaps";
+
+    // Audio
+    if (settings.value("no-audio", false).toBool()) arguments << "--no-audio";
+    
+    QString audioCodec = settings.value("audio-codec", "Default (opus)").toString();
+    if (audioCodec != "Default (opus)") arguments << "--audio-codec" << audioCodec;
+
+    QString audioBitRate = settings.value("audio-bit-rate", "Default (128K)").toString();
+    if (audioBitRate != "Default (128K)") arguments << "--audio-bit-rate" << audioBitRate;
+
+    // Window
+    if (settings.value("fullscreen", false).toBool()) arguments << "--fullscreen";
+    if (settings.value("window-borderless", false).toBool()) arguments << "--window-borderless";
+    
+    QString windowTitle = settings.value("window-title", "").toString();
+    if (!windowTitle.isEmpty()) {
+        arguments << "--window-title" << windowTitle;
+    } else {
+        arguments << "--window-title" << appName;
+    }
+
+    // Advanced
+    QString customArgs = settings.value("custom-args", "").toString();
+    if (!customArgs.isEmpty()) {
+        arguments << customArgs.split(" ", Qt::SkipEmptyParts);
+    }
 
     qDebug() << "Launching scrcpy with args:" << arguments;
 

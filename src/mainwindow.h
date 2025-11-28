@@ -26,6 +26,7 @@ private slots:
     void onLoadError(const QString &error);
     void onExit();
     void onAbout();
+    void onSettings();
 
 private:
     void setupUI();

@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "settingsdialog.h"
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QDebug>
@@ -22,6 +23,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionManualAdd, &QAction::triggered, this, &MainWindow::onManualAddClicked);
     connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onExit);
     connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAbout);
+
+    // Create Settings menu item programmatically since we can't edit .ui easily
+    QAction *actionSettings = new QAction("Settings", this);
+    ui->menubar->addAction(actionSettings);
+    connect(actionSettings, &QAction::triggered, this, &MainWindow::onSettings);
 
     // Connect app manager signals
     connect(appManager, &AppManager::appsLoaded, this, &MainWindow::onAppsLoaded);
@@ -171,5 +177,11 @@ void MainWindow::onAbout()
                       "<p>This application provides a native GUI interface for managing "
                       "and launching scrcpy instances.</p>"
                       "<p>Licensed under MIT License</p>");
+}
+
+void MainWindow::onSettings()
+{
+    SettingsDialog dialog(this);
+    dialog.exec();
 }
 

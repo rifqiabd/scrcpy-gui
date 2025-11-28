@@ -18,12 +18,14 @@ set(SOURCES
     src/mainwindow.cpp
     src/scrcpywindow.cpp
     src/appmanager.cpp
+    src/settingsdialog.cpp
 )
 
 set(HEADERS
     src/mainwindow.h
     src/scrcpywindow.h
     src/appmanager.h
+    src/settingsdialog.h
 )
 
 # UI files (optional, if using Qt Designer)
