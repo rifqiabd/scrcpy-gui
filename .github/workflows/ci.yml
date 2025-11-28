@@ -74,12 +74,16 @@ jobs:
       run: |
         cd build
         cmake --build . --config Release
+        
+    - name: Deploy
+      run: |
+        windeployqt build/Release/scrcpy-gui.exe --dir build/Release/
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: scrcpy-gui-windows
-        path: build/Release/scrcpy-gui.exe
+        path: build/Release/
 
   build-macos:
     runs-on: macos-latest
@@ -110,12 +114,17 @@ jobs:
       run: |
         cd build
         make
+        
+    - name: Deploy
+      run: |
+        macdeployqt build/scrcpy-gui.app -dmg
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: scrcpy-gui-macos
-        path: build/scrcpy-gui
+        path: build/scrcpy-gui.dmg
+
 
   release:
     needs: [build-linux, build-windows, build-macos]
@@ -127,13 +136,19 @@ jobs:
       with:
         path: artifacts
 
+    - name: Zip Windows Artifact
+      run: |
+        cd artifacts/scrcpy-gui-windows
+        zip -r ../../scrcpy-gui-windows.zip .
+        cd ../..
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
           artifacts/scrcpy-gui-linux/scrcpy-gui
-          artifacts/scrcpy-gui-windows/scrcpy-gui.exe
-          artifacts/scrcpy-gui-macos/scrcpy-gui
+          scrcpy-gui-windows.zip
+          artifacts/scrcpy-gui-macos/scrcpy-gui.dmg
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
