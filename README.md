@@ -9,9 +9,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/yourusername/scrcpy-gui/actions"><img src="https://github.com/yourusername/scrcpy-gui/workflows/CI%20Build/badge.svg" alt="CI Build"></a>
+  <a href="https://github.com/rifqiabd/scrcpy-gui/actions"><img src="https://github.com/rifqiabd/scrcpy-gui/workflows/CI%20Build/badge.svg" alt="CI Build"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
-  <a href="https://github.com/yourusername/scrcpy-gui/releases"><img src="https://img.shields.io/github/v/release/yourusername/scrcpy-gui" alt="Release"></a>
+  <a href="https://github.com/rifqiabd/scrcpy-gui/releases"><img src="https://img.shields.io/github/v/release/rifqiabd/scrcpy-gui" alt="Release"></a>
   <img src="https://img.shields.io/badge/Qt-6.x-41CD52?logo=qt" alt="Qt 6.x">
   <img src="https://img.shields.io/badge/C++-17-00599C?logo=c%2B%2B" alt="C++17">
 </p>
@@ -61,7 +61,7 @@ brew install qt@6 cmake android-platform-tools scrcpy
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/scrcpy-gui.git
+git clone https://github.com/rifqiabd/scrcpy-gui.git
 cd scrcpy-gui
 
 # Create build directory
