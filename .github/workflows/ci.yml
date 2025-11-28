@@ -13,22 +13,28 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        version: '6.5.0'
-        modules: 'qtbase qttools'
+        python-version: '3.x'
+
+    - name: Install Qt
+      run: |
+        pip install aqtinstall
+        aqt install-qt linux desktop 6.5.0 gcc_64
+        echo "Qt6_DIR=$PWD/Qt/6.5.0/gcc_64/lib/cmake/Qt6" >> $GITHUB_ENV
+        echo "PATH=$PWD/Qt/6.5.0/gcc_64/bin:$PATH" >> $GITHUB_ENV
     
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y cmake build-essential adb
+        sudo apt-get install -y cmake build-essential libgl1-mesa-dev
     
     - name: Configure CMake
       run: |
         mkdir build
         cd build
-        cmake ..
+        cmake .. -DCMAKE_PREFIX_PATH=$Qt6_DIR
     
     - name: Build
       run: |
@@ -47,17 +53,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        version: '6.5.0'
-        modules: 'qtbase qttools'
+        python-version: '3.x'
+
+    - name: Install Qt
+      run: |
+        pip install aqtinstall
+        aqt install-qt windows desktop 6.5.0 win64_mingw
+        echo "Qt6_DIR=$PWD/Qt/6.5.0/mingw_64/lib/cmake/Qt6" >> $env:GITHUB_ENV
+        echo "PATH=$PWD/Qt/6.5.0/mingw_64/bin;$env:PATH" >> $env:GITHUB_ENV
     
     - name: Configure CMake
       run: |
         mkdir build
         cd build
-        cmake -G "MinGW Makefiles" ..
+        cmake -G "MinGW Makefiles" .. -DCMAKE_PREFIX_PATH=$env:Qt6_DIR
     
     - name: Build
       run: |
@@ -76,11 +88,17 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
+    - name: Set up Python
+      uses: actions/setup-python@v5
       with:
-        version: '6.5.0'
-        modules: 'qtbase qttools'
+        python-version: '3.x'
+
+    - name: Install Qt
+      run: |
+        pip install aqtinstall
+        aqt install-qt mac desktop 6.5.0 clang_64
+        echo "Qt6_DIR=$PWD/Qt/6.5.0/macos/lib/cmake/Qt6" >> $GITHUB_ENV
+        echo "PATH=$PWD/Qt/6.5.0/macos/bin:$PATH" >> $GITHUB_ENV
     
     - name: Install dependencies
       run: |
@@ -90,7 +108,7 @@ jobs:
       run: |
         mkdir build
         cd build
-        cmake ..
+        cmake .. -DCMAKE_PREFIX_PATH=$Qt6_DIR
     
     - name: Build
       run: |
