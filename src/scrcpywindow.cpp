@@ -92,6 +92,7 @@ void ScrcpyWindow::onScrcpyFinished(int exitCode, QProcess::ExitStatus exitStatu
         statusLabel->setText("Scrcpy closed normally.");
     } else {
         QString errorOutput = scrcpyProcess->readAllStandardError();
+        qCritical() << "Scrcpy error output:" << errorOutput;
         statusLabel->setText("Scrcpy exited with error code: " + QString::number(exitCode) + 
                            "\n\nError output:\n" + errorOutput);
     }
