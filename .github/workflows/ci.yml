@@ -77,7 +77,7 @@ jobs:
         
     - name: Deploy
       run: |
-        windeployqt build/Release/scrcpy-gui.exe --dir build/Release/
+        windeployqt build/Release/scrcpy-gui.exe --dir build/Release/ --no-translations
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4

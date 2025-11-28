@@ -38,6 +38,7 @@ set(RESOURCES
 
 # Create executable
 add_executable(${PROJECT_NAME}
+    MACOSX_BUNDLE
     ${SOURCES}
     ${HEADERS}
     ${UI_FILES}
