@@ -20,7 +20,7 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v4
       with:
-        version: '6.7.3'
+        version: '6.8.3'
         host: 'linux'
         target: 'desktop'
         arch: 'gcc_64'
@@ -77,7 +77,7 @@ jobs:
         
     - name: Deploy
       run: |
-        windeployqt build/Release/scrcpy-gui.exe --dir build/Release/ --release --no-translations --no-system-d3d-compiler --no-opengl-sw --no-compiler-runtime --no-quick-import
+        windeployqt build/Release/scrcpy-gui.exe --dir build/Release/ --release --no-translations --no-system-d3d-compiler --no-opengl-sw --no-compiler-runtime --qmldir qml
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
