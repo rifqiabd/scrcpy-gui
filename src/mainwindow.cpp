@@ -26,7 +26,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Create Settings menu item programmatically since we can't edit .ui easily
     QAction *actionSettings = new QAction("Settings", this);
-    ui->menubar->addAction(actionSettings);
+    ui->menuBar->addAction(actionSettings);
     connect(actionSettings, &QAction::triggered, this, &MainWindow::onSettings);
 
     // Connect app manager signals
