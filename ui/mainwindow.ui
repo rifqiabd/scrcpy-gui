@@ -46,7 +46,7 @@
         <property name="topMargin">
          <number>0</number>
         </property>
-<property name="rightMargin">
+        <property name="rightMargin">
          <number>0</number>
         </property>
         <property name="bottomMargin">
@@ -154,6 +154,19 @@
             </property>
             <property name="icon">
              <iconset theme="list-add"/>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="mirrorDeviceButton">
+            <property name="text">
+             <string>Mirror Device</string>
+            </property>
+            <property name="icon">
+             <iconset theme="video-display"/>
+            </property>
+            <property name="toolTip">
+             <string>Launch full device mirror</string>
             </property>
            </widget>
           </item>

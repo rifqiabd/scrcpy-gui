@@ -24,6 +24,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->appListWidget, &QListWidget::itemClicked, this, &MainWindow::onAppSelected);
     connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::onRefreshClicked);
     connect(ui->manualAddButton, &QPushButton::clicked, this, &MainWindow::onManualAddClicked);
+    connect(ui->mirrorDeviceButton, &QPushButton::clicked, this, &MainWindow::onMirrorDeviceClicked);
     
     // Connect filter radio buttons
     connect(ui->allAppsRadio, &QRadioButton::toggled, this, &MainWindow::onFilterChanged);
@@ -120,8 +121,11 @@ void MainWindow::launchScrcpy(const QString &packageName, const QString &appName
     // Build scrcpy command
     QStringList arguments;
 
-    arguments << "--new-display";
-    arguments << "--start-app=" + packageName;
+    // Only use --new-display and --start-app if launching specific app
+    if (!packageName.isEmpty()) {
+        arguments << "--new-display";
+        arguments << "--start-app=" + packageName;
+    }
 
     // Load settings
     QSettings settings("ScrcpyGUI", "Settings");
@@ -182,14 +186,16 @@ void MainWindow::launchScrcpy(const QString &packageName, const QString &appName
     qDebug() << "Launching scrcpy with args:" << arguments;
 
     appendLog("========================================", "#4fc3f7");
-    appendLog(QString("[%1] Launching scrcpy for %2")
+    appendLog(QString("[%1] Launching scrcpy: %2")
               .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
               .arg(appName), "#4fc3f7");
-    appendLog("Package: " + packageName, "#9e9e9e");
+    if (!packageName.isEmpty()) {
+        appendLog("Package: " + packageName, "#9e9e9e");
+    }
     appendLog("Command: scrcpy " + arguments.join(" "), "#9e9e9e");
     appendLog("========================================", "#4fc3f7");
 
-    ui->scrcpyStatusLabel->setText("Starting scrcpy for " + appName + "...");
+    ui->scrcpyStatusLabel->setText("Starting " + appName + "...");
     scrcpyProcess->start("scrcpy", arguments);
 }
 
@@ -294,6 +300,20 @@ void MainWindow::onScrcpyReadyReadStandardError()
         // stderr dari scrcpy biasanya info, bukan error
         appendLog("[stderr] " + output.trimmed(), "#ffc107");
     }
+}
+
+void MainWindow::onMirrorDeviceClicked()
+{
+    qDebug() << "Launching full device mirror";
+
+    // Stop current scrcpy if running
+    if (scrcpyProcess && scrcpyProcess->state() == QProcess::Running) {
+        appendLog("Stopping current scrcpy session...", "#ff9800");
+        stopScrcpy();
+    }
+
+    // Launch scrcpy in full device mirror mode (empty packageName)
+    launchScrcpy("", "Full Device Mirror");
 }
 
 void MainWindow::onRefreshClicked()

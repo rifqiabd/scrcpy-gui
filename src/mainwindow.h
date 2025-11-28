@@ -26,6 +26,7 @@ private slots:
     void onAppSelected(QListWidgetItem *item);
     void onRefreshClicked();
     void onManualAddClicked();
+    void onMirrorDeviceClicked();
     void onAppsLoaded(const QList<AppInfo> &apps);
     void onLoadError(const QString &error);
     void onExit();
