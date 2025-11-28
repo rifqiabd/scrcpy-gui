@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>qml/main.qml</file>
+        <file>qml/AppListPanel.qml</file>
+        <file>qml/LogPanel.qml</file>
+        <file>qml/SettingsDialog.qml</file>
+    </qresource>
+</RCC>

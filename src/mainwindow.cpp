@@ -1,93 +1,59 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
-#include "settingsdialog.h"
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QDebug>
 #include <QSettings>
 #include <QDateTime>
+#include <QQmlApplicationEngine>
+#include <QQmlEngine>
+#include <QQmlComponent>
+#include <QQuickWindow>
 
-MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
-    , ui(new Ui::MainWindow)
+MainWindow::MainWindow(QObject *parent)
+    : QObject(parent)
     , appManager(new AppManager(this))
+    , appListModel(new AppListModel(this))
     , scrcpyProcess(nullptr)
     , showRunningOnly(false)
+    , m_statusText("Ready")
+    , m_scrcpyStatusText("No scrcpy running")
+    , m_scrcpyStatusColor("gray")
+    , m_scrcpyRunning(false)
 {
-    ui->setupUi(this);
-    setWindowIcon(QIcon(":/resources/icon.png"));
-    
-    // Set splitter initial sizes (60% left, 40% right)
-    ui->splitter->setSizes(QList<int>() << 600 << 400);
-    
-    // Connect signals from UI elements
-    connect(ui->appListWidget, &QListWidget::itemClicked, this, &MainWindow::onAppSelected);
-    connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::onRefreshClicked);
-    connect(ui->manualAddButton, &QPushButton::clicked, this, &MainWindow::onManualAddClicked);
-    connect(ui->mirrorDeviceButton, &QPushButton::clicked, this, &MainWindow::onMirrorDeviceClicked);
-    
-    // Connect filter radio buttons
-    connect(ui->allAppsRadio, &QRadioButton::toggled, this, &MainWindow::onFilterChanged);
-    connect(ui->runningOnlyRadio, &QRadioButton::toggled, this, &MainWindow::onFilterChanged);
-    
-    // Connect scrcpy control buttons
-    connect(ui->stopScrcpyButton, &QPushButton::clicked, this, &MainWindow::onStopScrcpyClicked);
-    connect(ui->clearLogsButton, &QPushButton::clicked, this, &MainWindow::onClearLogsClicked);
-    
-    // Connect menu actions
-    connect(ui->actionRefresh, &QAction::triggered, this, &MainWindow::onRefreshClicked);
-    connect(ui->actionManualAdd, &QAction::triggered, this, &MainWindow::onManualAddClicked);
-    connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onExit);
-    connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAbout);
-
-    // Create Settings menu item programmatically since we can't edit .ui easily
-    QAction *actionSettings = new QAction("Settings", this);
-    ui->menuBar->addAction(actionSettings);
-    connect(actionSettings, &QAction::triggered, this, &MainWindow::onSettings);
-
-    // Connect app manager signals
+    // Connect signals from app manager
     connect(appManager, &AppManager::appsLoaded, this, &MainWindow::onAppsLoaded);
     connect(appManager, &AppManager::loadError, this, &MainWindow::onLoadError);
     connect(appManager, &AppManager::runningAppsLoaded, this, &MainWindow::onRunningAppsLoaded);
-
-    // Load apps on startup
-    loadAppList();
 }
 
 MainWindow::~MainWindow()
 {
     stopScrcpy();
-    delete ui;
 }
 
-void MainWindow::setupUI()
+void MainWindow::setStatusText(const QString &text)
 {
-    // No longer needed - UI is set up by ui->setupUi(this)
+    if (m_statusText != text) {
+        m_statusText = text;
+        emit statusTextChanged();
+    }
+}
+
+void MainWindow::windowReady()
+{
+    qDebug() << "Window ready, loading app list";
+    loadAppList();
 }
 
 void MainWindow::loadAppList()
 {
-    ui->statusLabel->setText("Loading apps...");
-    ui->appListWidget->clear();
-    ui->refreshButton->setEnabled(false);
-
+    setStatusText("Loading apps...");
+    appListModel->clear();
     appManager->loadApps();
 }
 
-void MainWindow::addAppToList(const AppInfo &appInfo)
+void MainWindow::onAppSelected(const QString &packageName, const QString &appName)
 {
-    QListWidgetItem *item = new QListWidgetItem(appInfo.name);
-    item->setData(Qt::UserRole, appInfo.packageName);
-    ui->appListWidget->addItem(item);
-}
-
-void MainWindow::onAppSelected(QListWidgetItem *item)
-{
-    if (!item) return;
-
-    QString packageName = item->data(Qt::UserRole).toString();
-    QString appName = item->text();
-
     qDebug() << "Launching scrcpy for:" << packageName;
 
     // Stop current scrcpy if running
@@ -185,17 +151,20 @@ void MainWindow::launchScrcpy(const QString &packageName, const QString &appName
 
     qDebug() << "Launching scrcpy with args:" << arguments;
 
-    appendLog("========================================", "#4fc3f7");
-    appendLog(QString("[%1] Launching scrcpy: %2")
-              .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-              .arg(appName), "#4fc3f7");
+    m_logText += QString("<span style='color:#4fc3f7;'>========================================</span><br>");
+    m_logText += QString("<span style='color:#4fc3f7;'>[%1] Launching scrcpy: %2</span><br>")
+                  .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+                  .arg(appName.toHtmlEscaped());
     if (!packageName.isEmpty()) {
-        appendLog("Package: " + packageName, "#9e9e9e");
+        m_logText += QString("<span style='color:#9e9e9e;'>Package: %1</span><br>").arg(packageName.toHtmlEscaped());
     }
-    appendLog("Command: scrcpy " + arguments.join(" "), "#9e9e9e");
-    appendLog("========================================", "#4fc3f7");
+    m_logText += QString("<span style='color:#9e9e9e;'>Command: scrcpy %1</span><br>").arg(arguments.join(" ").toHtmlEscaped());
+    m_logText += QString("<span style='color:#4fc3f7;'>========================================</span><br>");
+    emit logTextChanged();
 
-    ui->scrcpyStatusLabel->setText("Starting " + appName + "...");
+    m_scrcpyStatusText = "Starting " + appName + "...";
+    emit scrcpyStatusTextChanged();
+    
     scrcpyProcess->start("scrcpy", arguments);
 }
 
@@ -213,10 +182,10 @@ void MainWindow::stopScrcpy()
 
 void MainWindow::appendLog(const QString &text, const QString &color)
 {
-    QString coloredText = QString("<span style='color:%1;'>%2</span>")
-                          .arg(color)
-                          .arg(text.toHtmlEscaped());
-    ui->logTextEdit->append(coloredText);
+    m_logText += QString("<span style='color:%1;'>%2</span><br>")
+                  .arg(color)
+                  .arg(text.toHtmlEscaped());
+    emit logTextChanged();
 }
 
 void MainWindow::onStopScrcpyClicked()
@@ -226,7 +195,7 @@ void MainWindow::onStopScrcpyClicked()
 
 void MainWindow::onClearLogsClicked()
 {
-    ui->logTextEdit->clear();
+    m_logText.clear();
     appendLog("Logs cleared", "#9e9e9e");
 }
 
@@ -234,26 +203,33 @@ void MainWindow::onScrcpyStarted()
 {
     qDebug() << "Scrcpy started successfully";
     appendLog("Scrcpy started successfully!", "#4caf50");
-    ui->scrcpyStatusLabel->setText("Running: " + currentAppName);
-    ui->scrcpyStatusLabel->setStyleSheet("color: #4caf50; padding: 5px;");
-    ui->stopScrcpyButton->setEnabled(true);
+    m_scrcpyStatusText = "Running: " + currentAppName;
+    m_scrcpyStatusColor = "#4caf50";
+    m_scrcpyRunning = true;
+    emit scrcpyStatusTextChanged();
+    emit scrcpyStatusColorChanged();
+    emit scrcpyRunningChanged();
 }
 
 void MainWindow::onScrcpyFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
     qDebug() << "Scrcpy finished with exit code:" << exitCode;
 
-    ui->stopScrcpyButton->setEnabled(false);
+    m_scrcpyRunning = false;
+    emit scrcpyRunningChanged();
 
     if (exitStatus == QProcess::NormalExit && exitCode == 0) {
         appendLog("Scrcpy closed normally", "#4caf50");
-        ui->scrcpyStatusLabel->setText("No scrcpy running");
-        ui->scrcpyStatusLabel->setStyleSheet("color: gray; padding: 5px;");
+        m_scrcpyStatusText = "No scrcpy running";
+        m_scrcpyStatusColor = "gray";
     } else {
         appendLog(QString("Scrcpy exited with error code: %1").arg(exitCode), "#f44336");
-        ui->scrcpyStatusLabel->setText("Scrcpy error - see logs");
-        ui->scrcpyStatusLabel->setStyleSheet("color: #f44336; padding: 5px;");
+        m_scrcpyStatusText = "Scrcpy error - see logs";
+        m_scrcpyStatusColor = "#f44336";
     }
+    
+    emit scrcpyStatusTextChanged();
+    emit scrcpyStatusColorChanged();
 }
 
 void MainWindow::onScrcpyError(QProcess::ProcessError error)
@@ -264,7 +240,7 @@ void MainWindow::onScrcpyError(QProcess::ProcessError error)
         case QProcess::FailedToStart:
             errorMsg = "Failed to start scrcpy. Make sure scrcpy is installed and in your PATH.";
             appendLog("ERROR: " + errorMsg, "#f44336");
-            QMessageBox::critical(this, "Scrcpy Error", errorMsg + "\n\nYou can install it from: https://github.com/Genymobile/scrcpy");
+            // Note: QMessageBox in QML context requires special handling
             break;
         case QProcess::Crashed:
             errorMsg = "Scrcpy crashed";
@@ -280,9 +256,13 @@ void MainWindow::onScrcpyError(QProcess::ProcessError error)
     }
 
     qDebug() << "Scrcpy error:" << errorMsg;
-    ui->scrcpyStatusLabel->setText("Error - see logs");
-    ui->scrcpyStatusLabel->setStyleSheet("color: #f44336; padding: 5px;");
-    ui->stopScrcpyButton->setEnabled(false);
+    m_scrcpyStatusText = "Error - see logs";
+    m_scrcpyStatusColor = "#f44336";
+    m_scrcpyRunning = false;
+    
+    emit scrcpyStatusTextChanged();
+    emit scrcpyStatusColorChanged();
+    emit scrcpyRunningChanged();
 }
 
 void MainWindow::onScrcpyReadyReadStandardOutput()
@@ -323,21 +303,20 @@ void MainWindow::onRefreshClicked()
 
 void MainWindow::onManualAddClicked()
 {
+    // Note: QInputDialog in QML context - we'll keep using Qt Widgets dialogs
     bool ok;
-    QString packageName = QInputDialog::getText(this, "Manual Add App",
+    QString packageName = QInputDialog::getText(nullptr, "Manual Add App",
                                                 "Enter package name (e.g., com.example.app):",
                                                 QLineEdit::Normal, "", &ok);
 
     if (ok && !packageName.isEmpty()) {
         // Validate package name format
         if (!packageName.contains(".")) {
-            QMessageBox::warning(this, "Invalid Package Name",
-                               "Package name should be in format: com.example.app");
             return;
         }
 
         // Ask for display name
-        QString displayName = QInputDialog::getText(this, "App Display Name",
+        QString displayName = QInputDialog::getText(nullptr, "App Display Name",
                                                    "Enter display name:",
                                                    QLineEdit::Normal, packageName, &ok);
 
@@ -347,28 +326,21 @@ void MainWindow::onManualAddClicked()
             appInfo.name = displayName;
             appInfo.isCustom = true;
 
-            addAppToList(appInfo);
             appManager->saveCustomApp(appInfo);
-
-            ui->statusLabel->setText("Added: " + displayName);
+            setStatusText("Added: " + displayName);
+            
+            // Reload app list
+            loadAppList();
         }
     }
 }
 
 void MainWindow::onAppsLoaded(const QList<AppInfo> &apps)
 {
-    allLoadedApps = apps;  // Store all apps
+    allLoadedApps = apps;
     
-    ui->appListWidget->clear();
-
     if (apps.isEmpty()) {
-        ui->statusLabel->setText("No apps found. Make sure device is connected.");
-        QMessageBox::information(this, "No Apps Found",
-                               "No Android apps found.\n\n"
-                               "Make sure:\n"
-                               "1. Android device is connected via USB\n"
-                               "2. USB debugging is enabled\n"
-                               "3. ADB is installed and in PATH");
+        setStatusText("No apps found. Make sure device is connected.");
     } else {
         // Apply current filter
         if (showRunningOnly) {
@@ -378,28 +350,18 @@ void MainWindow::onAppsLoaded(const QList<AppInfo> &apps)
             applyFilter();
         }
     }
-
-    ui->refreshButton->setEnabled(true);
 }
 
 void MainWindow::onLoadError(const QString &error)
 {
-    ui->statusLabel->setText("Error: " + error);
-    ui->refreshButton->setEnabled(true);
-
-    QMessageBox::critical(this, "Error Loading Apps", error);
-}
-
-void MainWindow::onExit()
-{
-    close();
+    setStatusText("Error: " + error);
 }
 
 void MainWindow::onAbout()
 {
-    QMessageBox::about(this, "About Qt GUI Scrcpy",
+    QMessageBox::about(nullptr, "About Qt GUI Scrcpy",
                       "<h2>Qt GUI Scrcpy</h2>"
-                      "<p>Version 1.0.0</p>"
+                      "<p>Version 1.0.8</p>"
                       "<p>A cross-platform desktop GUI for scrcpy</p>"
                       "<p><a href='https://github.com/Genymobile/scrcpy'>scrcpy</a> "
                       "is a free and open source tool to display and control Android devices.</p>"
@@ -410,17 +372,30 @@ void MainWindow::onAbout()
 
 void MainWindow::onSettings()
 {
-    SettingsDialog dialog(this);
-    dialog.exec();
+    // Load QML settings dialog
+    QQmlEngine *engine = qmlEngine(this);
+    if (!engine) {
+        qWarning() << "Cannot create settings dialog: no QML engine";
+        return;
+    }
+
+    QQmlComponent component(engine, QUrl("qrc:/qml/SettingsDialog.qml"));
+    QObject *dialog = component.create();
+    
+    if (dialog) {
+        QMetaObject::invokeMethod(dialog, "open");
+    } else {
+        qWarning() << "Failed to create settings dialog:" << component.errorString();
+    }
 }
 
-void MainWindow::onFilterChanged()
+void MainWindow::onFilterChanged(bool showRunningOnly)
 {
-    showRunningOnly = ui->runningOnlyRadio->isChecked();
+    this->showRunningOnly = showRunningOnly;
     
     if (showRunningOnly) {
         // Load running apps from device
-        ui->statusLabel->setText("Loading running apps...");
+        setStatusText("Loading running apps...");
         appManager->loadRunningApps();
     } else {
         // Show all apps immediately
@@ -435,35 +410,32 @@ void MainWindow::onRunningAppsLoaded(const QSet<QString> &packages)
     
     if (showRunningOnly) {
         applyFilter();
-        ui->statusLabel->setText(QString("Showing %1 running apps")
-                                .arg(ui->appListWidget->count()));
+        setStatusText(QString("Showing %1 running apps").arg(runningPackages.size()));
     }
 }
 
 void MainWindow::applyFilter()
 {
-    ui->appListWidget->clear();
+    QList<AppInfo> filteredApps;
     
     if (showRunningOnly) {
         // Show only running apps
-        int count = 0;
         for (const AppInfo &app : allLoadedApps) {
             if (runningPackages.contains(app.packageName)) {
-                addAppToList(app);
-                count++;
+                filteredApps.append(app);
             }
         }
         
-        if (count == 0) {
-            ui->statusLabel->setText("No running apps found");
+        if (filteredApps.isEmpty()) {
+            setStatusText("No running apps found");
         } else {
-            ui->statusLabel->setText(QString("%1 running apps").arg(count));
+            setStatusText(QString("%1 running apps").arg(filteredApps.size()));
         }
     } else {
         // Show all apps
-        for (const AppInfo &app : allLoadedApps) {
-            addAppToList(app);
-        }
-        ui->statusLabel->setText(QString("Loaded %1 apps").arg(allLoadedApps.size()));
+        filteredApps = allLoadedApps;
+        setStatusText(QString("Loaded %1 apps").arg(allLoadedApps.size()));
     }
+    
+    appListModel->setApps(filteredApps);
 }

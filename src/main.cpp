@@ -1,4 +1,7 @@
 #include <QApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QQuickStyle>
 #include <QMessageBox>
 #include <QFile>
 #include <QTextStream>
@@ -6,8 +9,9 @@
 #include <QStandardPaths>
 #include <QDir>
 #include "mainwindow.h"
+#include "settingsmanager.h"
 
-// Custom message handler to log to file and show alerts
+// Custom message handler to log to file
 void messageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
     // Get log file path
@@ -45,10 +49,7 @@ void messageHandler(QtMsgType type, const QMessageLogContext &context, const QSt
 
     // Show alert for critical/fatal errors
     if (type == QtFatalMsg || type == QtCriticalMsg) {
-        // Use native message box if possible, or simple stderr if GUI not ready
         fprintf(stderr, "%s\n", qPrintable(txt));
-        // Note: Cannot safely use QMessageBox in all contexts, but helpful for startup errors
-        // if QApplication is running.
     }
 }
 
@@ -56,6 +57,7 @@ int main(int argc, char *argv[])
 {
     qInstallMessageHandler(messageHandler);
 
+    // Use QApplication for widget compatibility (dialogs)
     QApplication app(argc, argv);
 
     // Set application metadata
@@ -63,8 +65,47 @@ int main(int argc, char *argv[])
     QApplication::setApplicationVersion("1.0.8");
     QApplication::setOrganizationName("Qt GUI Scrcpy");
 
-    MainWindow window;
-    window.show();
+    // Set platform-specific style
+#ifdef Q_OS_WIN
+    QQuickStyle::setStyle("FluentWinUI3");
+    qDebug() << "Using FluentWinUI3 style for Windows";
+#elif defined(Q_OS_MACOS)
+    QQuickStyle::setStyle("macOS");
+    qDebug() << "Using macOS native style";
+#else
+    QQuickStyle::setStyle("Material");
+    qDebug() << "Using Material style for Linux";
+#endif
+
+    // Create QML engine
+    QQmlApplicationEngine engine;
+
+    // Create C++ backend objects
+    MainWindow *mainWindow = new MainWindow(&app);
+    SettingsManager *settingsManager = new SettingsManager(&app);
+
+    // Expose C++ objects to QML
+    engine.rootContext()->setContextProperty("mainWindow", mainWindow);
+    engine.rootContext()->setContextProperty("appListModel", mainWindow->getAppListModel());
+    engine.rootContext()->setContextProperty("settingsManager", settingsManager);
+
+    // Load QML
+    const QUrl url(QStringLiteral("qrc:/qml/main.qml"));
+    
+    QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
+        &app, [url](QObject *obj, const QUrl &objUrl) {
+            if (!obj && url == objUrl)
+                QCoreApplication::exit(-1);
+        }, Qt::QueuedConnection);
+
+    engine.load(url);
+
+    if (engine.rootObjects().isEmpty()) {
+        qCritical() << "Failed to load QML";
+        return -1;
+    }
+
+    qDebug() << "QML loaded successfully";
 
     return app.exec();
 }

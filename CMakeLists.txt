@@ -6,11 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/ui)
+# CMAKE_AUTOUIC removed - QML doesn't use .ui files
 
-# Find Qt6
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Gui)
+# Find Qt6 - Added Quick, Qml, QuickControls2 for QML support
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Widgets Gui Quick Qml QuickControls2)
 
 # Source files
 set(SOURCES
@@ -18,22 +17,22 @@ set(SOURCES
     src/mainwindow.cpp
     src/appmanager.cpp
     src/settingsdialog.cpp
+    src/applistmodel.cpp
+    src/settingsmanager.cpp
 )
 
 set(HEADERS
     src/mainwindow.h
     src/appmanager.h
     src/settingsdialog.h
-)
-
-# UI files (optional, if using Qt Designer)
-set(UI_FILES
-    ui/mainwindow.ui
+    src/applistmodel.h
+    src/settingsmanager.h
 )
 
 # Resource files
 set(RESOURCES
     resources.qrc
+    qml.qrc
 )
 
 # Create executable
@@ -41,7 +40,6 @@ add_executable(${PROJECT_NAME}
     MACOSX_BUNDLE
     ${SOURCES}
     ${HEADERS}
-    ${UI_FILES}
     ${RESOURCES}
 )
 
@@ -50,6 +48,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt6::Core
     Qt6::Widgets
     Qt6::Gui
+    Qt6::Quick
+    Qt6::Qml
+    Qt6::QuickControls2
 )
 
 # Include directories
