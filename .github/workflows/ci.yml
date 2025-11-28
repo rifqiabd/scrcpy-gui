@@ -56,25 +56,25 @@ jobs:
         version: '6.5.0'
         host: 'windows'
         target: 'desktop'
-        arch: 'win64_mingw'
+        arch: 'win64_msvc2019_64'
         cache: 'true'
     
     - name: Configure CMake
       run: |
         mkdir build
         cd build
-        cmake -G "MinGW Makefiles" ..
+        cmake ..
     
     - name: Build
       run: |
         cd build
-        mingw32-make
+        cmake --build . --config Release
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: scrcpy-gui-windows
-        path: build/scrcpy-gui.exe
+        path: build/Release/scrcpy-gui.exe
 
   build-macos:
     runs-on: macos-latest
