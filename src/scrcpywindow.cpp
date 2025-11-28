@@ -61,7 +61,7 @@ void ScrcpyWindow::launchScrcpy()
 
     // Build scrcpy command
     QStringList arguments;
-    arguments << "--app" << packageName;
+
     arguments << "--window-title" << appName;
     arguments << "--stay-awake";
 
