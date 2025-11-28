@@ -1,0 +1,104 @@
+name: CI Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.0'
+        modules: 'qtbase qttools'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential adb
+    
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+    
+    - name: Build
+      run: |
+        cd build
+        make
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: scrcpy-gui-linux
+        path: build/scrcpy-gui
+
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.0'
+        modules: 'qtbase qttools'
+    
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake -G "MinGW Makefiles" ..
+    
+    - name: Build
+      run: |
+        cd build
+        mingw32-make
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: scrcpy-gui-windows
+        path: build/scrcpy-gui.exe
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '6.5.0'
+        modules: 'qtbase qttools'
+    
+    - name: Install dependencies
+      run: |
+        brew install cmake
+    
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+    
+    - name: Build
+      run: |
+        cd build
+        make
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: scrcpy-gui-macos
+        path: build/scrcpy-gui

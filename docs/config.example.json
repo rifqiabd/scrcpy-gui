@@ -1,0 +1,18 @@
+{
+    "version": "1.0",
+    "customApps": [
+        {
+            "name": "Example App",
+            "package": "com.example.app"
+        },
+        {
+            "name": "My Custom App",
+            "package": "com.mycompany.customapp"
+        }
+    ],
+    "scrcpyOptions": {
+        "maxFps": 30,
+        "bitrate": "8M",
+        "stayAwake": true
+    }
+}

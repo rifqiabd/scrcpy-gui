@@ -1,6 +1,7 @@
 #include "scrcpywindow.h"
 #include <QMessageBox>
 #include <QDebug>
+#include <QTimer>
 
 ScrcpyWindow::ScrcpyWindow(const QString &packageName, const QString &appName, QWidget *parent)
     : QMainWindow(parent)

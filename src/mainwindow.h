@@ -3,12 +3,12 @@
 
 #include <QMainWindow>
 #include <QListWidget>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QLabel>
 #include "appmanager.h"
 #include "scrcpywindow.h"
+
+namespace Ui {
+class MainWindow;
+}
 
 class MainWindow : public QMainWindow
 {
@@ -24,21 +24,16 @@ private slots:
     void onManualAddClicked();
     void onAppsLoaded(const QList<AppInfo> &apps);
     void onLoadError(const QString &error);
+    void onExit();
+    void onAbout();
 
 private:
     void setupUI();
     void loadAppList();
     void addAppToList(const AppInfo &appInfo);
 
-    // UI Components
-    QWidget *centralWidget;
-    QVBoxLayout *mainLayout;
-    QLabel *titleLabel;
-    QListWidget *appListWidget;
-    QHBoxLayout *buttonLayout;
-    QPushButton *refreshButton;
-    QPushButton *manualAddButton;
-    QLabel *statusLabel;
+    // UI from Qt Designer
+    Ui::MainWindow *ui;
 
     // Business Logic
     AppManager *appManager;

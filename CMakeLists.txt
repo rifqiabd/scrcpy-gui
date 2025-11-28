@@ -30,11 +30,17 @@ set(UI_FILES
     ui/mainwindow.ui
 )
 
+# Resource files
+set(RESOURCES
+    resources.qrc
+)
+
 # Create executable
 add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${UI_FILES}
+    ${RESOURCES}
 )
 
 # Link Qt libraries

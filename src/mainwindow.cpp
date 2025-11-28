@@ -1,15 +1,29 @@
 #include "mainwindow.h"
+#include "ui_mainwindow.h"
 #include <QMessageBox>
 #include <QInputDialog>
 #include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
     , appManager(new AppManager(this))
 {
-    setupUI();
+    ui->setupUi(this);
+    setWindowIcon(QIcon(":/resources/icon.png"));
+    
+    // Connect signals from UI elements
+    connect(ui->appListWidget, &QListWidget::itemClicked, this, &MainWindow::onAppSelected);
+    connect(ui->refreshButton, &QPushButton::clicked, this, &MainWindow::onRefreshClicked);
+    connect(ui->manualAddButton, &QPushButton::clicked, this, &MainWindow::onManualAddClicked);
+    
+    // Connect menu actions
+    connect(ui->actionRefresh, &QAction::triggered, this, &MainWindow::onRefreshClicked);
+    connect(ui->actionManualAdd, &QAction::triggered, this, &MainWindow::onManualAddClicked);
+    connect(ui->actionExit, &QAction::triggered, this, &MainWindow::onExit);
+    connect(ui->actionAbout, &QAction::triggered, this, &MainWindow::onAbout);
 
-    // Connect signals
+    // Connect app manager signals
     connect(appManager, &AppManager::appsLoaded, this, &MainWindow::onAppsLoaded);
     connect(appManager, &AppManager::loadError, this, &MainWindow::onLoadError);
 
@@ -25,56 +39,19 @@ MainWindow::~MainWindow()
             window->close();
         }
     }
+    delete ui;
 }
 
 void MainWindow::setupUI()
 {
-    setWindowTitle("Qt GUI Scrcpy");
-    resize(600, 500);
-
-    // Central widget
-    centralWidget = new QWidget(this);
-    setCentralWidget(centralWidget);
-
-    mainLayout = new QVBoxLayout(centralWidget);
-
-    // Title
-    titleLabel = new QLabel("Android Apps", this);
-    QFont titleFont = titleLabel->font();
-    titleFont.setPointSize(16);
-    titleFont.setBold(true);
-    titleLabel->setFont(titleFont);
-    mainLayout->addWidget(titleLabel);
-
-    // App list
-    appListWidget = new QListWidget(this);
-    connect(appListWidget, &QListWidget::itemClicked, this, &MainWindow::onAppSelected);
-    mainLayout->addWidget(appListWidget);
-
-    // Buttons
-    buttonLayout = new QHBoxLayout();
-
-    refreshButton = new QPushButton("Refresh", this);
-    connect(refreshButton, &QPushButton::clicked, this, &MainWindow::onRefreshClicked);
-    buttonLayout->addWidget(refreshButton);
-
-    manualAddButton = new QPushButton("Manual Add", this);
-    connect(manualAddButton, &QPushButton::clicked, this, &MainWindow::onManualAddClicked);
-    buttonLayout->addWidget(manualAddButton);
-
-    mainLayout->addLayout(buttonLayout);
-
-    // Status label
-    statusLabel = new QLabel("Ready", this);
-    statusLabel->setStyleSheet("color: gray; padding: 5px;");
-    mainLayout->addWidget(statusLabel);
+    // No longer needed - UI is set up by ui->setupUi(this)
 }
 
 void MainWindow::loadAppList()
 {
-    statusLabel->setText("Loading apps...");
-    appListWidget->clear();
-    refreshButton->setEnabled(false);
+    ui->statusLabel->setText("Loading apps...");
+    ui->appListWidget->clear();
+    ui->refreshButton->setEnabled(false);
 
     appManager->loadApps();
 }
@@ -83,7 +60,7 @@ void MainWindow::addAppToList(const AppInfo &appInfo)
 {
     QListWidgetItem *item = new QListWidgetItem(appInfo.name);
     item->setData(Qt::UserRole, appInfo.packageName);
-    appListWidget->addItem(item);
+    ui->appListWidget->addItem(item);
 }
 
 void MainWindow::onAppSelected(QListWidgetItem *item)
@@ -143,17 +120,17 @@ void MainWindow::onManualAddClicked()
             addAppToList(appInfo);
             appManager->saveCustomApp(appInfo);
 
-            statusLabel->setText("Added: " + displayName);
+            ui->statusLabel->setText("Added: " + displayName);
         }
     }
 }
 
 void MainWindow::onAppsLoaded(const QList<AppInfo> &apps)
 {
-    appListWidget->clear();
+    ui->appListWidget->clear();
 
     if (apps.isEmpty()) {
-        statusLabel->setText("No apps found. Make sure device is connected.");
+        ui->statusLabel->setText("No apps found. Make sure device is connected.");
         QMessageBox::information(this, "No Apps Found",
                                "No Android apps found.\n\n"
                                "Make sure:\n"
@@ -164,16 +141,35 @@ void MainWindow::onAppsLoaded(const QList<AppInfo> &apps)
         for (const AppInfo &app : apps) {
             addAppToList(app);
         }
-        statusLabel->setText(QString("Loaded %1 apps").arg(apps.size()));
+        ui->statusLabel->setText(QString("Loaded %1 apps").arg(apps.size()));
     }
 
-    refreshButton->setEnabled(true);
+    ui->refreshButton->setEnabled(true);
 }
 
 void MainWindow::onLoadError(const QString &error)
 {
-    statusLabel->setText("Error: " + error);
-    refreshButton->setEnabled(true);
+    ui->statusLabel->setText("Error: " + error);
+    ui->refreshButton->setEnabled(true);
 
     QMessageBox::critical(this, "Error Loading Apps", error);
 }
+
+void MainWindow::onExit()
+{
+    close();
+}
+
+void MainWindow::onAbout()
+{
+    QMessageBox::about(this, "About Qt GUI Scrcpy",
+                      "<h2>Qt GUI Scrcpy</h2>"
+                      "<p>Version 1.0.0</p>"
+                      "<p>A cross-platform desktop GUI for scrcpy</p>"
+                      "<p><a href='https://github.com/Genymobile/scrcpy'>scrcpy</a> "
+                      "is a free and open source tool to display and control Android devices.</p>"
+                      "<p>This application provides a native GUI interface for managing "
+                      "and launching scrcpy instances.</p>"
+                      "<p>Licensed under MIT License</p>");
+}
+
