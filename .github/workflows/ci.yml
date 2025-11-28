@@ -1,10 +1,15 @@
-name: CI Build
+name: CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
   build-linux:
@@ -111,3 +116,24 @@ jobs:
       with:
         name: scrcpy-gui-macos
         path: build/scrcpy-gui
+
+  release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          artifacts/scrcpy-gui-linux/scrcpy-gui
+          artifacts/scrcpy-gui-windows/scrcpy-gui.exe
+          artifacts/scrcpy-gui-macos/scrcpy-gui
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
