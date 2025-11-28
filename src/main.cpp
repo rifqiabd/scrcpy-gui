@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
 
     // Set application metadata
     QApplication::setApplicationName("Qt GUI Scrcpy");
-    QApplication::setApplicationVersion("1.0.0");
+    QApplication::setApplicationVersion("1.0.4");
     QApplication::setOrganizationName("Qt GUI Scrcpy");
 
     MainWindow window;
